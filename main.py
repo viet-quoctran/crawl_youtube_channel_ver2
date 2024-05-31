@@ -24,12 +24,16 @@ settings = Settings()
 # Khởi tạo API
 api = GPMLoginApiV3(settings.api_url, settings.start_endpoint, settings.close_endpoint, settings.update_endpoint)
 
+def write_status(message):
+    with open("status.log", "a", encoding="utf-8") as f:
+        f.write(message + "\n")
+
 def main():
     search_urls = settings.search_urls
+    proxies = settings.proxies
     proxy_index = 0
-    current_proxy = settings.proxies[proxy_index]
-    ic(current_proxy)
-    driver = setup_driver(api, settings.profile_id, current_proxy)
+    current_proxy = proxies[proxy_index]
+    driver = setup_driver(api, settings.profile_id, current_proxy, update_proxy=False)
     if not driver:
         return
 
@@ -45,25 +49,16 @@ def main():
                     else:
                         duplicate_count += 1  # Tăng biến đếm nếu URL bị trùng
 
-                ic(f"Total channel URLs collected: {len(collected_urls)}")
-                ic(f"Total duplicate channels: {duplicate_count}")  # Hiển thị số lượng video bị trùng
+                status_message = f"Total channel URLs collected: {len(collected_urls)}"
+                write_status(status_message)
                 break
-        except NoSuchElementException:
-            print("Encountered 404 error, switching proxy...")
-            proxy_index = (proxy_index + 1) % len(settings.proxies)
-            driver.quit()
-            current_proxy = settings.proxies[proxy_index]
-            ic(current_proxy)
-            driver = setup_driver(api, settings.profile_id, current_proxy)
-            if not driver:
-                return
-        except TimeoutException:
-            print("Loading search URL took too long, switching proxy...")
-            proxy_index = (proxy_index + 1) % len(settings.proxies)
-            driver.quit()
-            current_proxy = settings.proxies[proxy_index]
-            ic(current_proxy)
-            driver = setup_driver(api, settings.profile_id, current_proxy)
+        except (NoSuchElementException, TimeoutException):
+            status_message = "Error encountered, switching proxy..."
+            write_status(status_message)
+            proxy_index = (proxy_index + 1) % len(proxies)
+            api.close_profile(settings.profile_id)
+            current_proxy = proxies[proxy_index]
+            driver = setup_driver(api, settings.profile_id, current_proxy, update_proxy=True)
             if not driver:
                 return
 
@@ -85,8 +80,9 @@ def main():
         print(f'Sub Count: {channel_info["sub_count"]}')
         print(f'Video Count: {channel_info["video_count"]}')
         print('-----------------------------')
-
-    driver.quit()
+        
+    api.close_profile(settings.profile_id)
+    
 
 if __name__ == "__main__":
     main()

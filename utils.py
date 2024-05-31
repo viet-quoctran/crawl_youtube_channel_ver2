@@ -13,14 +13,16 @@ from selenium.common.exceptions import StaleElementReferenceException, NoSuchEle
 from icecream import ic
 from api import GPMLoginApiV3
 
-def setup_driver(api, profile_id, proxy):
-    # Cập nhật proxy cho profile
-    api.update_proxy(profile_id, proxy)
+def setup_driver(api, profile_id, proxy, update_proxy):
+    if update_proxy:
+        message = f"Run with proxy: {proxy}"
+        write_status(message)
+        api.update_proxy(profile_id, proxy)
 
     # Khởi động profile
     start_result = api.start_profile(profile_id)
     if not start_result or "data" not in start_result:
-        print("Failed to start profile")
+        write_status("Failed to start profile")
         return None
 
     options = Options()
@@ -29,6 +31,10 @@ def setup_driver(api, profile_id, proxy):
     service = Service(executable_path=start_result["data"]["driver_path"])
     driver = webdriver.Chrome(service=service, options=options)
     return driver
+
+def write_status(message):
+    with open("status.log", "a", encoding="utf-8") as f:
+        f.write(message + "\n")
 
 def crawl_data(driver, search_urls):
     all_channel_urls = []
@@ -54,15 +60,18 @@ def crawl_data(driver, search_urls):
                         elif channel_url_path:
                             channel_url = f"https://www.youtube.com{channel_url_path}"
                         else:
-                            ic(f"Invalid channel_url_path: {channel_url_path}")
+                            message = f"Invalid channel_url_path: {channel_url_path}"
+                            write_status(message)
                             continue
 
                         all_channel_urls.append(channel_url)
                     except StaleElementReferenceException:
-                        ic(f"StaleElementReferenceException encountered for video.")
+                        message = "StaleElementReferenceException encountered for video."
+                        write_status(message)
                         continue
                     except NoSuchElementException:
-                        ic(f"NoSuchElementException encountered for video: {video}")
+                        message = f"NoSuchElementException encountered for video: {video}"
+                        write_status(message)
                         continue
 
                 driver.execute_script("window.scrollTo(0, document.documentElement.scrollHeight);")
@@ -73,14 +82,16 @@ def crawl_data(driver, search_urls):
                     break
                 last_height = new_height
 
-            ic(f"Total channel URLs collected: {len(all_channel_urls)}")
+            message = f"Total channel URLs collected: {len(all_channel_urls)}"
+            write_status(message)
         except NoSuchElementException as e:
             if "404" in driver.page_source:
                 raise e
             else:
                 continue
         except TimeoutException:
-            print(f"Loading search URL {search_url} took too long, skipping...")
+            message = f"Loading search URL {search_url} took too long, skipping..."
+            write_status(message)
             continue
 
     return all_channel_urls
@@ -89,10 +100,9 @@ def crawl_channel_info(driver, channel_url, api, profile_id, proxy, channel_info
     while True:
         # Kiểm tra trạng thái HTTP của URL kênh trước khi truy cập bằng Selenium
         response = requests.head(channel_url)
-        ic(response.status_code)
         if response.status_code != 200:
-            ic(channel_url)
-            print(f"URL {channel_url} is not reachable, skipping to next channel...")
+            message = f"URL {channel_url} is not reachable, skipping to next channel..."
+            write_status(message)
             return None
         
         try:
@@ -135,10 +145,11 @@ def crawl_channel_info(driver, channel_url, api, profile_id, proxy, channel_info
 
             return channel_info
         except (NoSuchElementException, TimeoutException):
-            ic("Loading channel URL took too long, restarting profile...")
+            message = "Loading channel URL took too long, restarting profile..."
+            write_status(message)
             api.close_profile(profile_id)
             time.sleep(5)  # Thời gian chờ để đảm bảo profile đã đóng hoàn toàn
-            driver = setup_driver(api, profile_id, proxy)  # Khởi động lại profile với proxy
+            driver = setup_driver(api, profile_id, proxy, update_proxy=True)  # Khởi động lại profile với proxy
             if not driver:
                 return None
             continue

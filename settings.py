@@ -9,7 +9,7 @@ class Settings:
         self.proxies = []
         self.profile_id = ''
         self.search_urls = []
-        self.excel_file_path = 'channel_info.xlsx'
+        self.excel_file_path = 'channel_info.xlsx'  # Mặc định tên file Excel
         self.load_settings()
 
     def load_settings(self):
@@ -19,6 +19,7 @@ class Settings:
                 self.proxies = data.get("proxies", [])
                 self.profile_id = data.get("profile_id", "")
                 self.search_urls = data.get("search_urls", [])
+                self.excel_file_path = data.get("excel_file_path", "channel_info.xlsx")  # Load tên file Excel từ settings.json
         except FileNotFoundError:
             pass
 
@@ -26,7 +27,8 @@ class Settings:
         data = {
             "proxies": self.proxies,
             "profile_id": self.profile_id,
-            "search_urls": self.search_urls
+            "search_urls": self.search_urls,
+            "excel_file_path": self.excel_file_path  # Lưu tên file Excel vào settings.json
         }
         with open('settings.json', 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
