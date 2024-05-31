@@ -15,8 +15,6 @@ from api import GPMLoginApiV3
 
 def setup_driver(api, profile_id, proxy, update_proxy):
     if update_proxy:
-        message = f"Run with proxy: {proxy}"
-        write_status(message)
         api.update_proxy(profile_id, proxy)
 
     # Khởi động profile
@@ -53,7 +51,7 @@ def crawl_data(driver, search_urls):
                 for video in video_elements:
                     try:
                         channel_element = video.find_element(By.CSS_SELECTOR, 'a.yt-simple-endpoint.style-scope.yt-formatted-string')
-                        channel_url_path = channel_element.getAttribute('href')
+                        channel_url_path = channel_element.get_attribute('href')
                         
                         if channel_url_path and channel_url_path.startswith("http"):
                             channel_url = channel_url_path

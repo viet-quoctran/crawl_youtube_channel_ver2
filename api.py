@@ -1,5 +1,8 @@
 import requests
 
+def write_status(message):
+    with open("status.log", "a", encoding="utf-8") as f:
+        f.write(message + "\n")
 class GPMLoginApiV3:
     def __init__(self, api_url, start_endpoint, close_endpoint, update_endpoint):
         self.api_url = api_url
@@ -41,6 +44,8 @@ class GPMLoginApiV3:
         try:
             response = requests.post(url, json=data)
             if response.status_code == 200:
+                message = f"Run with proxy: {proxy}"
+                write_status(message)
                 return response.json()
             else:
                 print(f"Failed to update proxy for profile with ID {profile_id}: {response.status_code} {response.text}")

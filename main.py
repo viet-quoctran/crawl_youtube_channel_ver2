@@ -13,7 +13,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from settings import Settings
 from api import GPMLoginApiV3
-from utils import setup_driver, crawl_channel_info, crawl_data
+from utils import setup_driver, crawl_channel_info, crawl_data, write_status
 
 # Đặt mã hóa đầu ra thành UTF-8
 sys.stdout = io.TextIOWrapper(sys.stdout.detach(), encoding='utf-8', errors='ignore')
@@ -23,10 +23,6 @@ settings = Settings()
 
 # Khởi tạo API
 api = GPMLoginApiV3(settings.api_url, settings.start_endpoint, settings.close_endpoint, settings.update_endpoint)
-
-def write_status(message):
-    with open("status.log", "a", encoding="utf-8") as f:
-        f.write(message + "\n")
 
 def main():
     search_urls = settings.search_urls
@@ -69,7 +65,7 @@ def main():
         channel_infos_df = pd.DataFrame()
 
     for i, channel_url in enumerate(collected_urls):
-        channel_info = crawl_channel_info(driver, channel_url, api, settings.profile_id, current_proxy, channel_infos_df, settings.excel_file_path)
+        channel_info = crawl_channel_info(driver, channel_url, api, settings.profile_id, current_proxy, proxies, proxy_index, channel_infos_df, settings.excel_file_path)
         if channel_info is None:
             continue
 
