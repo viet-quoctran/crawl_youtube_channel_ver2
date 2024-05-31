@@ -53,7 +53,7 @@ def crawl_data(driver, search_urls):
                 for video in video_elements:
                     try:
                         channel_element = video.find_element(By.CSS_SELECTOR, 'a.yt-simple-endpoint.style-scope.yt-formatted-string')
-                        channel_url_path = channel_element.get_attribute('href')
+                        channel_url_path = channel_element.getAttribute('href')
                         
                         if channel_url_path and channel_url_path.startswith("http"):
                             channel_url = channel_url_path
@@ -96,7 +96,7 @@ def crawl_data(driver, search_urls):
 
     return all_channel_urls
 
-def crawl_channel_info(driver, channel_url, api, profile_id, proxy, channel_infos_df, excel_file_path):
+def crawl_channel_info(driver, channel_url, api, profile_id, proxy, proxies, proxy_index, channel_infos_df, excel_file_path):
     while True:
         # Kiểm tra trạng thái HTTP của URL kênh trước khi truy cập bằng Selenium
         response = requests.head(channel_url)
@@ -149,7 +149,12 @@ def crawl_channel_info(driver, channel_url, api, profile_id, proxy, channel_info
             write_status(message)
             api.close_profile(profile_id)
             time.sleep(5)  # Thời gian chờ để đảm bảo profile đã đóng hoàn toàn
-            driver = setup_driver(api, profile_id, proxy, update_proxy=True)  # Khởi động lại profile với proxy
+
+            # Cập nhật proxy_index để lấy proxy tiếp theo
+            proxy_index = (proxy_index + 1) % len(proxies)
+            proxy = proxies[proxy_index]
+
+            driver = setup_driver(api, profile_id, proxy, update_proxy=True)  # Khởi động lại profile với proxy mới
             if not driver:
                 return None
             continue
