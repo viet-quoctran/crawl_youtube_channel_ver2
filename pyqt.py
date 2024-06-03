@@ -1,15 +1,11 @@
 import sys
 import io
-import requests
 import subprocess
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
-    QPushButton, QLineEdit, QTextEdit, QLabel, QListWidget, QListWidgetItem, QGroupBox, QCheckBox
+    QPushButton, QLineEdit, QTextEdit, QLabel, QListWidget, QListWidgetItem, QGroupBox
 )
 from PyQt5.QtCore import Qt, QTimer
-from googletrans import Translator, LANGUAGES
-from icecream import ic
-from country_to_language import country_to_language  # Import từ file country_to_language.py
 from settings import Settings  # Import từ file settings.py
 
 # Đặt mã hóa đầu ra thành UTF-8
@@ -34,7 +30,7 @@ class MainWindow(QMainWindow):
     def initUI(self):
         main_layout = QVBoxLayout()
 
-        # Tạo group box cho từ khóa, proxy và profile ID
+        # Tạo group box cho từ khóa, API keys và profile ID
         input_group_box = QGroupBox("Inputs")
         input_layout = QVBoxLayout()
 
@@ -63,22 +59,22 @@ class MainWindow(QMainWindow):
 
         input_layout.addLayout(input_hbox)
 
-        # Nhập proxy
-        proxy_hbox = QHBoxLayout()
-        self.proxy_input = QLineEdit(self)
-        self.proxy_input.setPlaceholderText("IP:port:username:password")
-        self.proxy_input.setFixedHeight(30)  # Chỉnh chiều cao
-        self.proxy_input.setStyleSheet("font-size: 12px; padding: 5px;")  # Chỉnh kích thước font và padding
-        proxy_hbox.addWidget(QLabel("Proxy:"))
-        proxy_hbox.addWidget(self.proxy_input)
+        # Nhập API key
+        api_hbox = QHBoxLayout()
+        self.api_key_input = QLineEdit(self)
+        self.api_key_input.setPlaceholderText("Enter API key")
+        self.api_key_input.setFixedHeight(30)  # Chỉnh chiều cao
+        self.api_key_input.setStyleSheet("font-size: 12px; padding: 5px;")  # Chỉnh kích thước font và padding
+        api_hbox.addWidget(QLabel("API Key:"))
+        api_hbox.addWidget(self.api_key_input)
 
-        self.add_proxy_button = QPushButton("Add Proxy", self)
-        self.add_proxy_button.clicked.connect(self.add_proxy)
-        self.add_proxy_button.setFixedHeight(30)  # Chỉnh chiều cao
-        self.add_proxy_button.setStyleSheet("background-color: #007BFF; color: white; font-size: 12px; padding: 5px;")  # Chỉnh màu và kích thước font
-        proxy_hbox.addWidget(self.add_proxy_button)
+        self.add_api_key_button = QPushButton("Add API Key", self)
+        self.add_api_key_button.clicked.connect(self.add_api_key)
+        self.add_api_key_button.setFixedHeight(30)  # Chỉnh chiều cao
+        self.add_api_key_button.setStyleSheet("background-color: #007BFF; color: white; font-size: 12px; padding: 5px;")  # Chỉnh màu và kích thước font
+        api_hbox.addWidget(self.add_api_key_button)
 
-        input_layout.addLayout(proxy_hbox)
+        input_layout.addLayout(api_hbox)
 
         # Nhập tên file Excel
         excel_hbox = QHBoxLayout()
@@ -92,7 +88,7 @@ class MainWindow(QMainWindow):
         input_layout.addLayout(excel_hbox)
         input_group_box.setLayout(input_layout)
 
-        # Danh sách từ khóa và proxy nằm ngang nhau
+        # Danh sách từ khóa và API keys nằm ngang nhau
         lists_hbox = QHBoxLayout()
 
         # Danh sách từ khóa
@@ -109,19 +105,19 @@ class MainWindow(QMainWindow):
 
         lists_hbox.addLayout(keyword_list_layout)
 
-        # Danh sách proxy
-        proxy_list_layout = QVBoxLayout()
-        proxy_list_layout.addWidget(QLabel("Proxies:"))
-        self.proxy_list = QListWidget(self)
-        proxy_list_layout.addWidget(self.proxy_list)
+        # Danh sách API keys
+        api_key_list_layout = QVBoxLayout()
+        api_key_list_layout.addWidget(QLabel("API Keys:"))
+        self.api_key_list = QListWidget(self)
+        api_key_list_layout.addWidget(self.api_key_list)
 
-        self.delete_proxy_button = QPushButton("Delete Selected Proxies", self)
-        self.delete_proxy_button.clicked.connect(self.delete_selected_proxies)
-        self.delete_proxy_button.setFixedHeight(30)  # Chỉnh chiều cao
-        self.delete_proxy_button.setStyleSheet("background-color: #FF0000; color: white; font-size: 12px; padding: 5px;")  # Chỉnh màu và kích thước font
-        proxy_list_layout.addWidget(self.delete_proxy_button)
+        self.delete_api_key_button = QPushButton("Delete Selected API Keys", self)
+        self.delete_api_key_button.clicked.connect(self.delete_selected_api_keys)
+        self.delete_api_key_button.setFixedHeight(30)  # Chỉnh chiều cao
+        self.delete_api_key_button.setStyleSheet("background-color: #FF0000; color: white; font-size: 12px; padding: 5px;")  # Chỉnh màu và kích thước font
+        api_key_list_layout.addWidget(self.delete_api_key_button)
 
-        lists_hbox.addLayout(proxy_list_layout)
+        lists_hbox.addLayout(api_key_list_layout)
 
         # Phần mô tả trạng thái tiến trình ở cuối cùng
         status_layout = QVBoxLayout()
@@ -159,14 +155,9 @@ class MainWindow(QMainWindow):
         self.profile_id_input.setText(self.settings.profile_id)
         self.excel_input.setText(self.settings.excel_file_path.rsplit('.', 1)[0])  # Load tên file Excel mà không có đuôi
 
-        for proxy in self.settings.proxies:
-            country = self.lookup_proxy_country(proxy)
-            if country:
-                item_text = f"{proxy} ({country})"
-            else:
-                item_text = proxy
-            item = CheckableListWidgetItem(item_text)
-            self.proxy_list.addItem(item)
+        for api_key in self.settings.api_keys:
+            item = CheckableListWidgetItem(api_key)
+            self.api_key_list.addItem(item)
 
         for url in self.settings.search_urls:
             keyword = url.split('=')[-1].replace('+', ' ')
@@ -180,70 +171,26 @@ class MainWindow(QMainWindow):
             self.append_status("Please enter a keyword", error=True)
             return
 
-        # Lấy proxy đầu tiên trong danh sách proxy để dịch từ khóa
-        if self.proxy_list.count() == 0:
-            self.append_status("Please enter at least one proxy", error=True)
+        item = CheckableListWidgetItem(keyword)
+        self.keyword_list.addItem(item)
+        self.keyword_input.clear()
+
+    def add_api_key(self):
+        api_key = self.api_key_input.text()
+
+        if not api_key:
+            self.append_status("Please enter an API key", error=True)
             return
 
-        first_proxy_item = self.proxy_list.item(0)
-        proxy_text = first_proxy_item.text()
-        proxy_country = proxy_text.split('(')[-1].replace(')', '').strip() if '(' in proxy_text else None
+        item = CheckableListWidgetItem(api_key)
+        self.api_key_list.addItem(item)
+        self.api_key_input.clear()
 
-        if proxy_country and proxy_country in country_to_language:
-            language_code = country_to_language[proxy_country]
-            translated_keyword = self.translate_keyword(keyword, language_code)
-            item = CheckableListWidgetItem(translated_keyword)
-            self.keyword_list.addItem(item)
-            self.keyword_input.clear()
-            self.append_status(f"Keyword '{keyword}' translated to '{translated_keyword}' using proxy country '{proxy_country}'")
-        else:
-            self.append_status("Unable to determine the language for the proxy country", error=True)
-            item = CheckableListWidgetItem(keyword)
-            self.keyword_list.addItem(item)
-            self.keyword_input.clear()
-
-    def add_proxy(self):
-        proxy = self.proxy_input.text()
-
-        if not proxy:
-            self.append_status("Please enter a proxy", error=True)
-            return
-
-        country = self.lookup_proxy_country(proxy)
-        if country:
-            item_text = f"{proxy} ({country})"
-        else:
-            item_text = proxy
-
-        item = CheckableListWidgetItem(item_text)
-        self.proxy_list.addItem(item)
-        self.proxy_input.clear()
-
-    def delete_selected_proxies(self):
-        for index in reversed(range(self.proxy_list.count())):
-            item = self.proxy_list.item(index)
+    def delete_selected_api_keys(self):
+        for index in reversed(range(self.api_key_list.count())):
+            item = self.api_key_list.item(index)
             if item.checkState() == Qt.Checked:
-                self.proxy_list.takeItem(index)
-
-    def lookup_proxy_country(self, proxy):
-        ip = proxy.split(':')[0]
-        try:
-            response = requests.get(f"https://ipinfo.io/{ip}/json")
-            if response.status_code == 200:
-                data = response.json()
-                country = data.get("country", "Unknown")
-                self.append_status(f"Proxy country: {country}")
-                return country
-            else:
-                self.append_status("Failed to lookup proxy country", error=True)
-        except requests.RequestException as e:
-            self.append_status(f"Error looking up proxy: {e}", error=True)
-        return None
-
-    def translate_keyword(self, keyword, language_code):
-        translator = Translator()
-        translation = translator.translate(keyword, dest=language_code)
-        return translation.text
+                self.api_key_list.takeItem(index)
 
     def delete_selected_keywords(self):
         for index in reversed(range(self.keyword_list.count())):
@@ -252,9 +199,6 @@ class MainWindow(QMainWindow):
                 self.keyword_list.takeItem(index)
 
     def save_settings(self):
-        # Lưu thông tin proxy
-        self.settings.proxies = [self.proxy_list.item(index).text().split(' ')[0] for index in range(self.proxy_list.count())]
-
         # Lưu thông tin profile ID
         self.settings.profile_id = self.profile_id_input.text()
 
@@ -271,6 +215,9 @@ class MainWindow(QMainWindow):
             keywords.append(f"https://www.youtube.com/results?search_query={item}")
 
         self.settings.search_urls = keywords
+
+        # Lưu API keys
+        self.settings.api_keys = [self.api_key_list.item(index).text() for index in range(self.api_key_list.count())]
 
         # Gọi hàm save_settings của lớp Settings để lưu vào file settings.json
         self.settings.save_settings()

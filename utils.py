@@ -10,13 +10,25 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import StaleElementReferenceException, NoSuchElementException, TimeoutException
-from icecream import ic
 from api import GPMLoginApiV3
+from settings import Settings  # Import Settings để lấy API_KEYS
+import sys  # Thêm sys để dùng sys.exit
 
-def setup_driver(api, profile_id, proxy, update_proxy):
-    if update_proxy:
-        api.update_proxy(profile_id, proxy)
+settings = Settings()
+current_key_index = 0
 
+def get_current_api_key():
+    global current_key_index
+    return settings.api_keys[current_key_index]
+
+def switch_api_key():
+    global current_key_index
+    current_key_index = (current_key_index + 1) % len(settings.api_keys)
+    if current_key_index == 0:  # Nếu quay lại key đầu tiên, tức là đã hết tất cả các keys
+        return False
+    return True
+
+def setup_driver(api, profile_id, update_proxy=False):
     # Khởi động profile
     start_result = api.start_profile(profile_id)
     if not start_result or "data" not in start_result:
@@ -94,65 +106,94 @@ def crawl_data(driver, search_urls):
 
     return all_channel_urls
 
-def crawl_channel_info(driver, channel_url, api, profile_id, proxy, proxies, proxy_index, channel_infos_df, excel_file_path):
-    while True:
-        # Kiểm tra trạng thái HTTP của URL kênh trước khi truy cập bằng Selenium
-        response = requests.head(channel_url)
-        if response.status_code != 200:
-            message = f"URL {channel_url} is not reachable, skipping to next channel..."
-            write_status(message)
-            return None
-        
-        try:
-            driver.get(channel_url)
-            container_element = WebDriverWait(driver, 20).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, 'div#page-header.style-scope.ytd-tabbed-page-header'))
-            )
+def get_channel_info_from_api(channel_url):
+    global current_key_index
 
-            # Lấy tên kênh từ thẻ h1
-            channel_name_element = container_element.find_element(By.CSS_SELECTOR, 'h1.dynamic-text-view-model-wiz__h1')
-            channel_name = channel_name_element.text
+    channel_id = None
+    handle = None
 
-            # Lấy metadata và phân tích cú pháp
-            metadata_element = container_element.find_element(By.CSS_SELECTOR, 'yt-content-metadata-view-model')
-            metadata_text = metadata_element.text
+    # Kiểm tra loại URL
+    if "/channel/" in channel_url:
+        match = re.search(r"youtube\.com\/channel\/([a-zA-Z0-9_-]+)", channel_url)
+        if match:
+            channel_id = match.group(1)
+    elif "/user/" in channel_url:
+        match = re.search(r"youtube\.com\/user\/([a-zA-Z0-9_-]+)", channel_url)
+        if match:
+            handle = match.group(1)
+    elif "/@" in channel_url:
+        match = re.search(r"youtube\.com\/@([a-zA-Z0-9_-]+)", channel_url)
+        if match:
+            handle = match.group(1)
 
-            # Sử dụng regex để phân tích metadata
-            metadata_parts = re.split(r'•', metadata_text)
-            id_part = metadata_parts[0].strip()
-            sub_count_part = metadata_parts[1].strip()
-            video_count_part = metadata_parts[2].strip() if len(metadata_parts) > 2 else ""
+    if not channel_id and not handle:
+        write_status(f"Invalid channel URL: {channel_url}")
+        return None
 
-            channel_info = {
-                'channel_name': channel_name,
-                'id': id_part,
-                'sub_count': sub_count_part,
-                'video_count': video_count_part,
-                'channel_url': channel_url
-            }
-
-            # Đọc DataFrame hiện có từ file nếu tồn tại
-            if os.path.exists(excel_file_path):
-                existing_df = pd.read_excel(excel_file_path)
-                channel_infos_df = pd.concat([existing_df, pd.DataFrame([channel_info])], ignore_index=True)
+    if handle:
+        while True:
+            api_key = get_current_api_key()
+            search_url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q={handle}&key={api_key}"
+            response = requests.get(search_url)
+            if response.status_code == 200:
+                data = response.json()
+                if "items" in data and len(data["items"]) > 0:
+                    channel_id = data["items"][0]["snippet"]["channelId"]
+                    break
+                else:
+                    write_status(f"No data found for handle: {handle}")
+                    return None
+            elif response.status_code == 403:  # Quota exceeded
+                write_status(f"Quota exceeded for API key: {api_key}, switching key...")
+                if not switch_api_key():
+                    write_status("All API keys have exceeded their quota.")
+                    sys.exit("All API keys have exceeded their quota. Exiting program.")
             else:
-                channel_infos_df = pd.DataFrame([channel_info])
-
-            # Lưu DataFrame vào file Excel
-            channel_infos_df.to_excel(excel_file_path, index=False)
-
-            return channel_info
-        except (NoSuchElementException, TimeoutException):
-            message = "Loading channel URL took too long, restarting profile..."
-            write_status(message)
-            api.close_profile(profile_id)
-            time.sleep(5)  # Thời gian chờ để đảm bảo profile đã đóng hoàn toàn
-
-            # Cập nhật proxy_index để lấy proxy tiếp theo
-            proxy_index = (proxy_index + 1) % len(proxies)
-            proxy = proxies[proxy_index]
-
-            driver = setup_driver(api, profile_id, proxy, update_proxy=True)  # Khởi động lại profile với proxy mới
-            if not driver:
+                write_status(f"Failed to fetch channel info for handle: {handle}, status code: {response.status_code}")
                 return None
-            continue
+
+    while True:
+        api_key = get_current_api_key()
+        api_url = f"https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id={channel_id}&key={api_key}"
+
+        response = requests.get(api_url)
+        if response.status_code == 200:
+            data = response.json()
+            if "items" in data and len(data["items"]) > 0:
+                item = data["items"][0]
+                channel_info = {
+                    'channel_name': item['snippet']['title'],
+                    'id': channel_id,
+                    'sub_count': item['statistics'].get('subscriberCount', 'N/A'),
+                    'video_count': item['statistics'].get('videoCount', 'N/A'),
+                    'channel_url': channel_url
+                }
+                return channel_info
+            else:
+                write_status(f"No data found for channel URL: {channel_url}")
+                return None
+        elif response.status_code == 403:  # Quota exceeded
+            write_status(f"Quota exceeded for API key: {api_key}, switching key...")
+            if not switch_api_key():
+                write_status("All API keys have exceeded their quota.")
+                sys.exit("All API keys have exceeded their quota. Exiting program.")
+        else:
+            write_status(f"Failed to fetch channel info for URL: {channel_url}, status code: {response.status_code}")
+            return None
+
+def crawl_channel_info(channel_url, channel_infos_df, excel_file_path):
+    channel_info = get_channel_info_from_api(channel_url)
+    if channel_info is None:
+        return None
+
+    # Đọc DataFrame hiện có từ file nếu tồn tại
+    if os.path.exists(excel_file_path):
+        existing_df = pd.read_excel(excel_file_path)
+        channel_infos_df = pd.concat([existing_df, pd.DataFrame([channel_info])], ignore_index=True)
+    else:
+        channel_infos_df = pd.DataFrame([channel_info])
+
+    # Lưu DataFrame vào file Excel
+    channel_infos_df.to_excel(excel_file_path, index=False)
+
+    return channel_info
