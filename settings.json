@@ -1,14 +1,10 @@
 {
     "profile_id": "245e9cd3-668e-4fbe-a173-f60c33a8a56b",
     "search_urls": [
-        "https://www.youtube.com/results?search_query=釣りに行く",
-        "https://www.youtube.com/results?search_query=釣り体験"
+        "https://www.youtube.com/results?search_query=植物を育てる効果的な方法"
     ],
-    "excel_file_path": "dicau.xlsx",
+    "excel_file_path": "nong-nghiep-2.xlsx",
     "api_keys": [
-        "AIzaSyBwP7K6iOqhyzO3y9iG-xnYqMmvT9hTtgY",
-        "AIzaSyDKgxbdY8kMP6Pf1PvD4wnvHn2O-vDgBN0",
-        "AIzaSyBdBfTAzQEKhyrPYaJzFWWSRkIbn-rl8GI",
-        "AIzaSyA3GeWxDICBs-Req6NUSawZguYL2CwRSlw"
+        "AIzaSyDxpRLohMzMR-SUeUoT-uSdgnxCkvIuUq0"
     ]
 }

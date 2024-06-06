@@ -10,7 +10,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import StaleElementReferenceException, NoSuchElementException, TimeoutException
-from api import GPMLoginApiV3
+from api import GPMLoginApiV3, get_proxy_country
 from settings import Settings  # Import Settings để lấy API_KEYS
 import sys  # Thêm sys để dùng sys.exit
 
@@ -28,7 +28,7 @@ def switch_api_key():
         return False
     return True
 
-def setup_driver(api, profile_id, update_proxy=False):
+def setup_driver(api, profile_id):
     # Khởi động profile
     start_result = api.start_profile(profile_id)
     if not start_result or "data" not in start_result:
@@ -166,6 +166,7 @@ def get_channel_info_from_api(channel_url):
                     'id': channel_id,
                     'sub_count': item['statistics'].get('subscriberCount', 'N/A'),
                     'video_count': item['statistics'].get('videoCount', 'N/A'),
+                    'country': item['snippet'].get('country', 'N/A'),  # Lấy thông tin quốc gia nếu có
                     'channel_url': channel_url
                 }
                 return channel_info
@@ -181,9 +182,13 @@ def get_channel_info_from_api(channel_url):
             write_status(f"Failed to fetch channel info for URL: {channel_url}, status code: {response.status_code}")
             return None
 
-def crawl_channel_info(channel_url, channel_infos_df, excel_file_path):
+def crawl_channel_info(channel_url, channel_infos_df, excel_file_path, proxy_country):
     channel_info = get_channel_info_from_api(channel_url)
     if channel_info is None:
+        return None
+
+    # Chỉ lưu thông tin channel nếu quốc gia khớp với quốc gia của proxy
+    if channel_info['country'] != proxy_country:
         return None
 
     # Đọc DataFrame hiện có từ file nếu tồn tại

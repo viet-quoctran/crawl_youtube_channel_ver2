@@ -6,6 +6,7 @@ class Settings:
         self.start_endpoint = 'profiles/start/{id}'
         self.close_endpoint = 'profiles/close/{id}'
         self.update_endpoint = 'profiles/update/{id}'
+        self.profile_info_endpoint = 'profiles/{id}'
         self.profile_id = ''
         self.search_urls = []
         self.excel_file_path = 'channel_info.xlsx'  # Mặc định tên file Excel
